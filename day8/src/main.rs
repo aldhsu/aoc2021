@@ -1,0 +1,143 @@
+use std::collections::HashSet;
+
+fn part1(input: &str) -> usize {
+    input
+        .lines()
+        .map(|line| {
+            let (_, right) = line.split_once(" | ").expect("can't get left right");
+            right
+                .split_whitespace()
+                .filter(|groups| matches!(groups.len(), 2 | 3 | 4 | 7))
+                .count()
+        })
+        .sum()
+}
+
+fn part2(input: &str) -> usize {
+    input
+        .lines()
+        .map(|line| {
+            let (nums, right) = line.split_once(" | ").expect("can't get left right");
+            let mut nums = nums
+                .split_whitespace()
+                .map(|num| num.chars().collect::<std::collections::HashSet<char>>())
+                .collect::<Vec<_>>();
+
+            let one = nums.remove(
+                nums.iter()
+                    .position(|num| num.len() == 2)
+                    .expect("couldn't get one"),
+            );
+            let four = nums.remove(
+                nums.iter()
+                    .position(|num| num.len() == 4)
+                    .expect("couldn't get four"),
+            );
+            let seven = nums.remove(
+                nums.iter()
+                    .position(|num| num.len() == 3)
+                    .expect("couldn't get seven"),
+            );
+            let eight = nums.remove(
+                nums.iter()
+                    .position(|num| num.len() == 7)
+                    .expect("couldn't get eight"),
+            );
+            nums.sort_by_key(|num| num.len());
+
+            fn find_num<'a>(
+                haystack: &'a [HashSet<char>],
+                condition: impl Fn(&&HashSet<char>) -> bool,
+                num: &'static str,
+            ) -> Result<&'a HashSet<char>, String> {
+                let mut iter = haystack.iter().filter(condition);
+
+                let val = iter.next();
+
+                if let Some(val) = val {
+                    if iter.next().is_some() {
+                        return Err(format!("found too many values for {}", num));
+                    }
+                    Ok(val)
+                } else {
+                    Err(format!("couldn't find a value for {}", num))
+                }
+            }
+
+            let (five_counts, six_counts) =
+                nums.split_at(nums.partition_point(|num| num.len() < 6));
+
+            let six_test = eight.difference(&seven).cloned().collect::<HashSet<char>>();
+            // let six = six_counts.iter().find(|num| six_test.difference(num).next().is_none()).expect("couldn't find six");
+            let six = find_num(
+                six_counts,
+                |num| six_test.difference(num).count() == 0,
+                "six",
+            )
+            .unwrap();
+
+            let nine =
+                find_num(six_counts, |num| four.difference(num).count() == 0, "nine").unwrap();
+            let zero = find_num(six_counts, |num| num != &six && num != &nine, "zero").unwrap();
+
+            let five =
+                find_num(five_counts, |num| six.difference(num).count() == 1, "five").unwrap();
+
+            let three = find_num(
+                five_counts,
+                |num| five.difference(num).count() == 1,
+                "three",
+            )
+            .unwrap();
+            let two = find_num(five_counts, |num| num != &three && num != &five, "two").unwrap();
+
+            let num_map = [
+                zero, &one, two, three, &four, five, six, &seven, &eight, nine,
+            ];
+
+            dbg!(&num_map);
+            right
+                .split_whitespace()
+                .map(|num| {
+                    let chars = num.chars().collect::<HashSet<char>>();
+
+                    num_map
+                        .iter()
+                        .enumerate()
+                        .find_map(|(value, candidate)| (chars == **candidate).then(|| value))
+                        .unwrap_or_else(|| panic!("couldn't find matching number {:?}", chars))
+                })
+                .fold(0, |mut memo, num| {
+                    memo *= 10;
+                    memo += num;
+                    memo
+                })
+        })
+        .sum()
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn part2_works() {
+        let input = r#"be cfbegad cbdgef fgaecd cgeb fdcge agebfd fecdb fabcd edb | fdgacbe cefdb cefbgd gcbe
+edbfga begcd cbg gc gcadebf fbgde acbgfd abcde gfcbed gfec | fcgedb cgb dgebacf gc
+fgaebd cg bdaec gdafb agbcfd gdcbef bgcad gfac gcb cdgabef | cg cg fdcagb cbg
+fbegcd cbd adcefb dageb afcb bc aefdc ecdab fgdeca fcdbega | efabcd cedba gadfec cb
+aecbfdg fbg gf bafeg dbefa fcge gcbea fcaegb dgceab fcbdga | gecf egdcabf bgf bfgea
+fgeab ca afcebg bdacfeg cfaedg gcfdb baec bfadeg bafgc acf | gebdcfa ecba ca fadegcb
+dbcfg fgd bdegcaf fgec aegbdf ecdfab fbedc dacgb gdcebf gf | cefg dcbef fcge gbcadfe
+bdfegc cbegaf gecbf dfcage bdacg ed bedf ced adcbefg gebcd | ed bcgafe cdgba cbgef
+egadfb cdbfeg cegd fecab cgb gbdefca cg fgcdab egfdb bfceg | gbdfcae bgc cg cgb
+gcafb gcf dcaebfg ecagb gf abcdeg gaef cafbge fdbac fegbdc | fgae cfgab fg bagce"#;
+        assert_eq!(part2(input), 61229);
+    }
+}
+
+fn main() {
+    let input = include_str!("../input.txt");
+    println!("part1 {}", part1(input));
+    println!("part2 {}", part2(input));
+}
